@@ -57,11 +57,11 @@ oembed = {
     "version": "1.0",
     "type": "rich",
     "title": f"Instagram · {shortcode}",
-    "provider_name": "Instagram Reference Viewer",
+    "provider_name": "Instagram Embed",
     "provider_url": site_base,
-    "width": 540,
-    "height": 720,
-    "html": f'<iframe src="{site_base}" width="540" height="720" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title="Instagram post"></iframe>',
+    "width": 560,
+    "height": 780,
+    "html": f'<iframe src="{site_base}" width="560" height="780" frameborder="0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen title="Instagram post"></iframe>',
 }
 (out_dir / "oembed.json").write_text(json.dumps(oembed, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
