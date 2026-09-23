@@ -9,6 +9,10 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: instagram-embed-generator
+  cancel-in-progress: false
+
 jobs:
   create:
     if: startsWith(github.event.issue.title, '[Instagram Embed]')
@@ -20,9 +24,33 @@ jobs:
 
       - id: generate
         name: Generate embed page
+        continue-on-error: true
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: python .github/scripts/create_embed.py
+
+      - name: Explain invalid Instagram input
+        if: steps.generate.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          cat > /tmp/error.md <<'EOF'
+          Instagram 게시물 주소를 찾지 못했습니다.
+
+          아래 형식 중 하나를 확인해 다시 붙여 넣어 주세요.
+
+          - `https://www.instagram.com/p/게시물코드/`
+          - `https://www.instagram.com/reel/릴스코드/`
+          - Instagram에서 복사한 전체 **Embed 태그**
+
+          이 이슈는 수정할 수 있도록 열린 상태로 유지됩니다. 내용을 수정한 뒤에는 새 이슈로 다시 제출해 주세요.
+          EOF
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/error.md
+
+      - name: Stop after invalid input
+        if: steps.generate.outcome == 'failure'
+        run: exit 1
 
       - name: Commit generated page
         run: |
@@ -36,21 +64,50 @@ jobs:
             git push
           fi
 
-      - name: Deploy updated site
+      - id: deploy
+        name: Deploy and wait for GitHub Pages
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref main
+        run: |
+          started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run pages.yml --ref main
 
-      - name: Reply with FigJam URL
+          run_id=""
+          for attempt in {1..12}; do
+            sleep 5
+            run_id=$(gh run list \
+              --workflow pages.yml \
+              --event workflow_dispatch \
+              --branch main \
+              --limit 10 \
+              --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$started_at\")][0].databaseId // empty")
+            if [ -n "$run_id" ]; then
+              break
+            fi
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "Pages deployment run was not found."
+            exit 1
+          fi
+
+          gh run watch "$run_id" --exit-status
+
+      - name: Reply with ready-to-use FigJam URL
         env:
           GH_TOKEN: ${{ github.token }}
           PAGE_URL: ${{ steps.generate.outputs.page_url }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           cat > /tmp/reply.md <<EOF
-          생성 완료! 배포가 끝날 때까지 약 1분 기다린 뒤 아래 주소를 사용해 주세요.
+          생성과 배포가 모두 완료되었습니다. 아래 주소를 바로 사용할 수 있습니다.
 
-          **FigJam용 주소:** $PAGE_URL
+          **FigJam용 주소**
+
+          ```text
+          $PAGE_URL
+          ```
 
           FigJam에서 로컬 **Instagram Board Embed Test** 플러그인을 열고, 주소 입력란에 위 주소를 붙여 넣은 다음 **보드에 넣고 확인**을 누르면 됩니다.
           EOF
