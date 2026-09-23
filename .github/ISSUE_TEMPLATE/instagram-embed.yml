@@ -1,0 +1,15 @@
+name: Instagram FigJam 임베드 만들기
+description: 인스타 주소 또는 Embed 태그를 붙여 넣으면 FigJam용 페이지가 자동 생성됩니다.
+title: "[Instagram Embed] "
+body:
+  - type: textarea
+    id: instagram
+    attributes:
+      label: Instagram URL 또는 Embed 태그
+      description: Instagram 게시물/릴스 주소 또는 Instagram에서 복사한 전체 Embed 태그를 붙여 넣으세요.
+      placeholder: https://www.instagram.com/p/...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: 제출 후 약 1분 뒤 댓글로 FigJam용 주소가 안내됩니다.
