@@ -1,0 +1,52 @@
+name: Create Instagram Embed
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  create:
+    if: startsWith(github.event.issue.title, '[Instagram Embed]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - id: generate
+        name: Generate embed page
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python .github/scripts/create_embed.py
+
+      - name: Commit generated page
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "posts/${{ steps.generate.outputs.shortcode }}"
+          if git diff --cached --quiet; then
+            echo "No new files to commit."
+          else
+            git commit -m "Add Instagram embed ${{ steps.generate.outputs.shortcode }}"
+            git push
+          fi
+
+      - name: Reply with FigJam URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGE_URL: ${{ steps.generate.outputs.page_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          cat > /tmp/reply.md <<EOF
+          생성 완료! 배포가 끝날 때까지 약 1분 기다린 뒤 아래 주소를 사용해 주세요.
+
+          **FigJam용 주소:** $PAGE_URL
+
+          FigJam에서 로컬 **Instagram Board Embed Test** 플러그인을 열고, 주소 입력란에 위 주소를 붙여 넣은 다음 **보드에 넣고 확인**을 누르면 됩니다.
+          EOF
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/reply.md
+          gh issue close "$ISSUE_NUMBER" --reason completed
